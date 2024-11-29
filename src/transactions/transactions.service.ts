@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository } from 'typeorm';
+import { Between, FindManyOptions, Repository } from 'typeorm';
+import { endOfDay, isValid, parseISO, startOfDay } from 'date-fns';
 
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -73,19 +74,65 @@ export class TransactionsService {
     return 'Venta almacenada correctamente';
   }
 
-  findAll() {
-    return `This action returns all transactions`;
+  findAll(transactionDate?: string) {
+    const options: FindManyOptions<Transaction> = {
+      relations: {
+        contents: true,
+      },
+    };
+
+    if (transactionDate) {
+      const date = parseISO(transactionDate);
+      if (!isValid(date)) throw new BadRequestException('Fecha no valida');
+
+      const start = startOfDay(date);
+      const end = endOfDay(date);
+
+      options.where = {
+        transactionDate: Between(start, end),
+      };
+    }
+
+    return this.transactionRepository.find(options);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} transaction`;
+  async findOne(id: number) {
+    const transaction = await this.transactionRepository.findOne({
+      where: { id },
+      relations: {
+        contents: true,
+      },
+    });
+
+    if (!transaction) throw new NotFoundException('La venta no se encontro');
+
+    return transaction;
   }
 
   update(id: number, updateTransactionDto: UpdateTransactionDto) {
     return `This action updates a #${id} transaction`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} transaction`;
+  async remove(id: number) {
+    const transaction = await this.findOne(id);
+
+    for (const contents of transaction.contents) {
+      const product = await this.productRepository.findOneBy({
+        id: contents.product.id,
+      });
+
+      product.inventory += contents.quantity;
+      await this.productRepository.save(product);
+
+      const transactioContents =
+        await this.transactionContentsRepository.findOneBy({
+          id: contents.id,
+        });
+
+      await this.transactionContentsRepository.remove(transactioContents);
+    }
+
+    await this.transactionRepository.remove(transaction);
+    return { message: 'Venta eliminada correctamente' };
   }
 }
