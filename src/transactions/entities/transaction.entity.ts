@@ -1,9 +1,11 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 import { Product } from 'src/products/entities/product.entity';
@@ -16,14 +18,23 @@ export class Transaction {
   @Column({ type: 'decimal' })
   total: number;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP(6)' })
-  transactionDate: Date;
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  coupon: string;
+
+  @Column({ type: 'decimal', nullable: true })
+  discount: number;
 
   @OneToMany(
     () => TransactionContents,
     (transaction) => transaction.transaction,
   )
   contents: TransactionContents[];
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 }
 
 @Entity()

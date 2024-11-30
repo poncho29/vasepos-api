@@ -11,11 +11,15 @@ import { endOfDay, isValid, parseISO, startOfDay } from 'date-fns';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
+import { CouponsService } from 'src/coupons/coupons.service';
+
 import { Product } from 'src/products/entities/product.entity';
 import {
   TransactionContents,
   Transaction,
 } from './entities/transaction.entity';
+
+import { validateErrors } from 'src/helpers';
 
 @Injectable()
 export class TransactionsService {
@@ -26,52 +30,74 @@ export class TransactionsService {
     private readonly transactionContentsRepository: Repository<TransactionContents>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+
+    private readonly coupunService: CouponsService,
   ) {}
 
   async create(createTransactionDto: CreateTransactionDto) {
-    await this.productRepository.manager.transaction(
-      async (transactionEntityManager) => {
-        const transaction = new Transaction();
-        transaction.total = Number(
-          createTransactionDto.contents
-            .reduce((total, item) => total + item.price * item.quantity, 0)
-            .toFixed(2),
-        );
+    try {
+      await this.productRepository.manager.transaction(
+        async (transactionEntityManager) => {
+          const transaction = new Transaction();
 
-        for (const content of createTransactionDto.contents) {
-          const product = await transactionEntityManager.findOneBy(Product, {
-            id: content.productId,
-          });
+          // Calculate transaction total
+          const total = Number(
+            createTransactionDto.contents
+              .reduce((total, item) => total + item.price * item.quantity, 0)
+              .toFixed(2),
+          );
+          transaction.total = total;
 
-          const errors = [];
-
-          if (!product) {
-            errors.push(`El product con el ID ${content.productId} no existe`);
-            throw new NotFoundException(errors);
-          }
-
-          if (content.quantity > product.inventory) {
-            errors.push(
-              `El producto ${product.name} excede la cantidad disponible`,
+          // Apply discount coupon to the transaction
+          if (createTransactionDto.coupon) {
+            const { coupon } = await this.coupunService.applyCoupon(
+              createTransactionDto.coupon,
             );
-            throw new BadRequestException(errors);
+            const discount = total * (1 - coupon.percentage / 100);
+            transaction.discount = discount;
+            transaction.coupon = coupon.name;
+            transaction.total -= discount;
           }
 
-          product.inventory -= content.quantity;
+          for (const content of createTransactionDto.contents) {
+            const product = await transactionEntityManager.findOneBy(Product, {
+              id: content.productId,
+            });
 
-          const transactionContent = new TransactionContents();
-          transactionContent.quantity = content.quantity;
-          transactionContent.price = content.price;
-          transactionContent.product = product;
-          transactionContent.transaction = transaction;
+            const errors = [];
 
-          await transactionEntityManager.save(transaction);
-          await transactionEntityManager.save(transactionContent);
-        }
-      },
-    );
+            if (!product) {
+              errors.push(
+                `El product con el ID ${content.productId} no existe`,
+              );
+              throw new NotFoundException(errors);
+            }
 
-    return 'Venta almacenada correctamente';
+            if (content.quantity > product.inventory) {
+              errors.push(
+                `El producto ${product.name} excede la cantidad disponible`,
+              );
+              throw new BadRequestException(errors);
+            }
+
+            product.inventory -= content.quantity;
+
+            const transactionContent = new TransactionContents();
+            transactionContent.quantity = content.quantity;
+            transactionContent.price = content.price;
+            transactionContent.product = product;
+            transactionContent.transaction = transaction;
+
+            await transactionEntityManager.save(transaction);
+            await transactionEntityManager.save(transactionContent);
+          }
+        },
+      );
+
+      return { message: 'Venta almacenada correctamente' };
+    } catch (error) {
+      validateErrors(error);
+    }
   }
 
   findAll(transactionDate?: string) {
@@ -89,7 +115,7 @@ export class TransactionsService {
       const end = endOfDay(date);
 
       options.where = {
-        transactionDate: Between(start, end),
+        created_at: Between(start, end),
       };
     }
 

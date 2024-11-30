@@ -3,7 +3,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
-export const validateErrors = (error: any, message: string) => {
+export const validateErrors = (error: any, message = '') => {
   if (error.code === '23505') {
     throw new BadRequestException({
       error: {
