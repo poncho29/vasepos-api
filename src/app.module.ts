@@ -1,15 +1,16 @@
-import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Module } from '@nestjs/common';
 
 import { typeOrmConfig } from './config/typeorm.config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
+import { TransactionsModule } from './transactions/transactions.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
-import { TransactionsModule } from './transactions/transactions.module';
+import { CouponsModule } from './coupons/coupons.module';
 
 @Module({
   imports: [
@@ -20,9 +21,10 @@ import { TransactionsModule } from './transactions/transactions.module';
       useFactory: typeOrmConfig,
       inject: [ConfigService],
     }),
+    TransactionsModule,
     CategoriesModule,
     ProductsModule,
-    TransactionsModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
