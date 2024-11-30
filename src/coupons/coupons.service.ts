@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
+import { endOfDay, isAfter } from 'date-fns';
 import { Repository } from 'typeorm';
 
 import { Coupon } from './entities/coupon.entity';
 
-import { CreateCouponDto } from './dto/create-coupon.dto';
-import { UpdateCouponDto } from './dto/update-coupon.dto';
+import { CreateCouponDto, UpdateCouponDto } from './dto';
+
+import { validateErrors } from 'src/helpers';
 
 @Injectable()
 export class CouponsService {
@@ -15,8 +17,17 @@ export class CouponsService {
     private readonly couponRepository: Repository<Coupon>,
   ) {}
 
-  create(createCouponDto: CreateCouponDto) {
-    return this.couponRepository.save(createCouponDto);
+  async create(createCouponDto: CreateCouponDto) {
+    try {
+      const coupon = await this.couponRepository.save(createCouponDto);
+
+      return {
+        coupon,
+        message: 'Cupón creado correctamente',
+      };
+    } catch (error) {
+      validateErrors(error, `Ya existe un cupón con ese nombre`);
+    }
   }
 
   findAll() {
@@ -32,11 +43,19 @@ export class CouponsService {
   }
 
   async update(id: number, updateCouponDto: UpdateCouponDto) {
-    const coupon = await this.findOne(id);
+    try {
+      const coupon = await this.findOne(id);
 
-    Object.assign(coupon, updateCouponDto);
+      Object.assign(coupon, updateCouponDto);
+      const updatedCupon = await this.couponRepository.save(coupon);
 
-    return await this.couponRepository.save(coupon);
+      return {
+        coupon: updatedCupon,
+        message: 'Cupón actualizado correctamente',
+      };
+    } catch (error) {
+      validateErrors(error, `Ya existe un cupón con ese nombre`);
+    }
   }
 
   async remove(id: number) {
@@ -47,5 +66,22 @@ export class CouponsService {
     await this.couponRepository.remove(coupon);
 
     return { message: 'Cupón eliminado correctamente' };
+  }
+
+  async applyCoupon(name: string) {
+    const coupon = await this.couponRepository.findOneBy({ name });
+
+    if (!coupon) throw new NotFoundException('El cupón no existe');
+
+    const currentDate = new Date();
+    const expirationDate = endOfDay(coupon.expirationDate);
+
+    if (isAfter(currentDate, expirationDate))
+      throw new NotFoundException('El cupón ha expirado');
+
+    return {
+      message: 'Cupón válido',
+      coupon,
+    };
   }
 }
