@@ -5,22 +5,10 @@ import {
 
 export const validateErrors = (error: any, message = '') => {
   if (error.code === '23505') {
-    throw new BadRequestException({
-      error: {
-        table: error.table,
-        code: error.code,
-        detail: error.detail,
-      },
-      message,
-    });
+    throw new BadRequestException([message]);
   }
 
-  throw new InternalServerErrorException({
-    error: {
-      table: error.table,
-      code: error.code,
-      detail: error.detail,
-    },
-    message: 'Error inesperado, verifique los registros del servidor',
-  });
+  throw new InternalServerErrorException(
+    'Error inesperado, verifique los registros del servidor',
+  );
 };

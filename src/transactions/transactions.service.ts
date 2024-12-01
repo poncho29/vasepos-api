@@ -18,15 +18,13 @@ import {
   Transaction,
 } from './entities/transaction.entity';
 
-import { validateErrors } from 'src/helpers';
-
 @Injectable()
 export class TransactionsService {
   constructor(
     @InjectRepository(Transaction)
     private readonly transactionRepository: Repository<Transaction>,
-    @InjectRepository(TransactionContents)
-    private readonly transactionContentsRepository: Repository<TransactionContents>,
+    // @InjectRepository(TransactionContents)
+    // private readonly transactionContentsRepository: Repository<TransactionContents>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
 
@@ -34,69 +32,63 @@ export class TransactionsService {
   ) {}
 
   async create(createTransactionDto: CreateTransactionDto) {
-    try {
-      await this.productRepository.manager.transaction(
-        async (transactionEntityManager) => {
-          const transaction = new Transaction();
+    await this.productRepository.manager.transaction(
+      async (transactionEntityManager) => {
+        const transaction = new Transaction();
 
-          // Calculate transaction total
-          const total = Number(
-            createTransactionDto.contents
-              .reduce((total, item) => total + item.price * item.quantity, 0)
-              .toFixed(2),
+        // Calculate transaction total
+        const total = Number(
+          createTransactionDto.contents
+            .reduce((total, item) => total + item.price * item.quantity, 0)
+            .toFixed(2),
+        );
+        transaction.total = total;
+
+        // Apply discount coupon to the transaction
+        if (createTransactionDto.coupon) {
+          const { coupon } = await this.coupunService.applyCoupon(
+            createTransactionDto.coupon,
           );
-          transaction.total = total;
+          const discount = total * (coupon.percentage / 100);
+          transaction.discount = discount;
+          transaction.coupon = coupon.name;
+          transaction.total -= discount;
+        }
 
-          // Apply discount coupon to the transaction
-          if (createTransactionDto.coupon) {
-            const { coupon } = await this.coupunService.applyCoupon(
-              createTransactionDto.coupon,
+        for (const content of createTransactionDto.contents) {
+          const product = await transactionEntityManager.findOneBy(Product, {
+            id: content.productId,
+          });
+
+          const errors = [];
+
+          if (!product) {
+            errors.push(`El product con el ID ${content.productId} no existe`);
+            throw new NotFoundException(errors);
+          }
+
+          if (content.quantity > product.inventory) {
+            errors.push(
+              `El producto ${product.name} excede la cantidad disponible`,
             );
-            const discount = total * (1 - coupon.percentage / 100);
-            transaction.discount = discount;
-            transaction.coupon = coupon.name;
-            transaction.total -= discount;
+            throw new BadRequestException(errors);
           }
 
-          for (const content of createTransactionDto.contents) {
-            const product = await transactionEntityManager.findOneBy(Product, {
-              id: content.productId,
-            });
+          product.inventory -= content.quantity;
 
-            const errors = [];
+          const transactionContent = new TransactionContents();
+          transactionContent.quantity = content.quantity;
+          transactionContent.price = content.price;
+          transactionContent.product = product;
+          transactionContent.transaction = transaction;
 
-            if (!product) {
-              errors.push(
-                `El product con el ID ${content.productId} no existe`,
-              );
-              throw new NotFoundException(errors);
-            }
+          await transactionEntityManager.save(transaction);
+          await transactionEntityManager.save(transactionContent);
+        }
+      },
+    );
 
-            if (content.quantity > product.inventory) {
-              errors.push(
-                `El producto ${product.name} excede la cantidad disponible`,
-              );
-              throw new BadRequestException(errors);
-            }
-
-            product.inventory -= content.quantity;
-
-            const transactionContent = new TransactionContents();
-            transactionContent.quantity = content.quantity;
-            transactionContent.price = content.price;
-            transactionContent.product = product;
-            transactionContent.transaction = transaction;
-
-            await transactionEntityManager.save(transaction);
-            await transactionEntityManager.save(transactionContent);
-          }
-        },
-      );
-
-      return { message: 'Venta almacenada correctamente' };
-    } catch (error) {
-      validateErrors(error);
-    }
+    return { message: 'Venta almacenada correctamente' };
   }
 
   async findAll(query: GetTransactionDto) {
