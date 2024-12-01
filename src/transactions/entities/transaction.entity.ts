@@ -24,17 +24,20 @@ export class Transaction {
   @Column({ type: 'decimal', nullable: true })
   discount: number;
 
-  @OneToMany(
-    () => TransactionContents,
-    (transaction) => transaction.transaction,
-  )
-  contents: TransactionContents[];
+  @Column({ type: 'boolean', default: true })
+  status: boolean;
 
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @OneToMany(
+    () => TransactionContents,
+    (transaction) => transaction.transaction,
+  )
+  contents: TransactionContents[];
 }
 
 @Entity()

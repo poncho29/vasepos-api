@@ -5,11 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Between, FindManyOptions, Repository } from 'typeorm';
 import { endOfDay, isValid, parseISO, startOfDay } from 'date-fns';
+import { Between, FindManyOptions, Repository } from 'typeorm';
 
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { CreateTransactionDto, GetTransactionDto } from './dto';
 
 import { CouponsService } from 'src/coupons/coupons.service';
 
@@ -100,8 +99,15 @@ export class TransactionsService {
     }
   }
 
-  findAll(transactionDate?: string) {
+  async findAll(query: GetTransactionDto) {
+    const { take, skip, transactionDate, status = true } = query;
+
     const options: FindManyOptions<Transaction> = {
+      take: take ?? 2,
+      skip: skip ?? 0,
+      where: {
+        status,
+      },
       relations: {
         contents: true,
       },
@@ -115,11 +121,15 @@ export class TransactionsService {
       const end = endOfDay(date);
 
       options.where = {
+        ...options.where,
         created_at: Between(start, end),
       };
     }
 
-    return this.transactionRepository.find(options);
+    const [transactions, count] =
+      await this.transactionRepository.findAndCount(options);
+
+    return { transactions, count };
   }
 
   async findOne(id: number) {
@@ -135,30 +145,66 @@ export class TransactionsService {
     return transaction;
   }
 
-  update(id: number, updateTransactionDto: UpdateTransactionDto) {
-    return `This action updates a #${id} transaction`;
+  async cancelTransaction(id: number) {
+    await this.productRepository.manager.transaction(
+      async (transactionEntityManager) => {
+        const transaction = await transactionEntityManager.findOne(
+          Transaction,
+          {
+            where: { id },
+            relations: {
+              contents: true,
+            },
+          },
+        );
+
+        if (!transaction)
+          throw new NotFoundException(['La venta no se encontro']);
+
+        if (!transaction.status)
+          throw new BadRequestException(['La venta ya fue cancelada']);
+
+        for (const content of transaction.contents) {
+          const product = await transactionEntityManager.findOneBy(Product, {
+            id: content.product.id,
+          });
+
+          // Restablecer el inventario
+          product.inventory += content.quantity;
+
+          await transactionEntityManager.save(product);
+        }
+
+        // Se cancela la venta cambiando el status
+        transaction.status = !transaction.status;
+        await transactionEntityManager.save(transaction);
+      },
+    );
+
+    return { message: 'La venta fue cancelada correctamente' };
   }
 
-  async remove(id: number) {
-    const transaction = await this.findOne(id);
+  // async remove(id: number) {
+  //   const transaction = await this.findOne(id);
 
-    for (const contents of transaction.contents) {
-      const product = await this.productRepository.findOneBy({
-        id: contents.product.id,
-      });
+  //   for (const contents of transaction.contents) {
+  //     const product = await this.productRepository.findOneBy({
+  //       id: contents.product.id,
+  //     });
 
-      product.inventory += contents.quantity;
-      await this.productRepository.save(product);
+  //     product.inventory += contents.quantity;
+  //     await this.productRepository.save(product);
 
-      const transactioContents =
-        await this.transactionContentsRepository.findOneBy({
-          id: contents.id,
-        });
+  //     const transactioContents =
+  //       await this.transactionContentsRepository.findOneBy({
+  //         id: contents.id,
+  //       });
 
-      await this.transactionContentsRepository.remove(transactioContents);
-    }
+  //     await this.transactionContentsRepository.remove(transactioContents);
+  //   }
 
-    await this.transactionRepository.remove(transaction);
-    return { message: 'Venta eliminada correctamente' };
-  }
+  //   await this.transactionRepository.remove(transaction);
+
+  //   return { message: 'Venta eliminada correctamente' };
+  // }
 }

@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
@@ -11,10 +10,9 @@ import {
 
 import { TransactionsService } from './transactions.service';
 
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { CreateTransactionDto, GetTransactionDto } from './dto';
 
-import { IdValidationPipe } from 'src/common/pipes/id-validation.pipe';
+import { IdValidationPipe } from 'src/common/pipes';
 
 @Controller('transactions')
 export class TransactionsController {
@@ -26,8 +24,8 @@ export class TransactionsController {
   }
 
   @Get()
-  findAll(@Query('transactionDate') transactionDate: string) {
-    return this.transactionsService.findAll(transactionDate);
+  findAll(@Query() query: GetTransactionDto) {
+    return this.transactionsService.findAll(query);
   }
 
   @Get(':id')
@@ -35,16 +33,13 @@ export class TransactionsController {
     return this.transactionsService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(
-    @Param('id', IdValidationPipe) id: string,
-    @Body() updateTransactionDto: UpdateTransactionDto,
-  ) {
-    return this.transactionsService.update(+id, updateTransactionDto);
+  @Delete(':id')
+  cancelTransaction(@Param('id', IdValidationPipe) id: string) {
+    return this.transactionsService.cancelTransaction(+id);
   }
 
-  @Delete(':id')
-  remove(@Param('id', IdValidationPipe) id: string) {
-    return this.transactionsService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id', IdValidationPipe) id: string) {
+  //   return this.transactionsService.remove(+id);
+  // }
 }
