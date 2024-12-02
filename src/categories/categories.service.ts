@@ -8,7 +8,7 @@ import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
-import { validateErrors } from 'src/helpers';
+import { validateErrors } from '../helpers';
 
 @Injectable()
 export class CategoriesService {

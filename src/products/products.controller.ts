@@ -13,7 +13,7 @@ import { ProductsService } from './products.service';
 
 import { CreateProductDto, UpdateProductDto, GetProductDto } from './dto';
 
-import { IdValidationPipe } from 'src/common/pipes';
+import { IdValidationPipe } from '../common/pipes';
 
 @Controller('products')
 export class ProductsController {

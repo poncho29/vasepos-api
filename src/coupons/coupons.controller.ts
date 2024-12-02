@@ -14,7 +14,7 @@ import { CouponsService } from './coupons.service';
 
 import { ApplyCouponDto, CreateCouponDto, UpdateCouponDto } from './dto';
 
-import { IdValidationPipe } from 'src/common/pipes';
+import { IdValidationPipe } from '../common/pipes';
 
 @Controller('coupons')
 export class CouponsController {

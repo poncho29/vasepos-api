@@ -3,12 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { FindManyOptions, Repository } from 'typeorm';
 
-import { Category } from 'src/categories/entities/category.entity';
+import { Category } from '../categories/entities/category.entity';
 import { Product } from './entities/product.entity';
 
 import { CreateProductDto, UpdateProductDto, GetProductDto } from './dto';
 
-import { validateErrors } from 'src/helpers';
+import { validateErrors } from '../helpers';
 
 @Injectable()
 export class ProductsService {

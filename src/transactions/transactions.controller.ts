@@ -12,7 +12,7 @@ import { TransactionsService } from './transactions.service';
 
 import { CreateTransactionDto, GetTransactionDto } from './dto';
 
-import { IdValidationPipe } from 'src/common/pipes';
+import { IdValidationPipe } from '../common/pipes';
 
 @Controller('transactions')
 export class TransactionsController {

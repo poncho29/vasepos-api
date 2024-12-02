@@ -10,9 +10,9 @@ import { Between, FindManyOptions, Repository } from 'typeorm';
 
 import { CreateTransactionDto, GetTransactionDto } from './dto';
 
-import { CouponsService } from 'src/coupons/coupons.service';
+import { CouponsService } from '../coupons/coupons.service';
 
-import { Product } from 'src/products/entities/product.entity';
+import { Product } from '../products/entities/product.entity';
 import {
   TransactionContents,
   Transaction,

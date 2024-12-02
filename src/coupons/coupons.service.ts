@@ -8,7 +8,7 @@ import { Coupon } from './entities/coupon.entity';
 
 import { CreateCouponDto, UpdateCouponDto } from './dto';
 
-import { validateErrors } from 'src/helpers';
+import { validateErrors } from '../helpers';
 
 @Injectable()
 export class CouponsService {
